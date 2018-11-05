@@ -6,6 +6,7 @@
 # All Rights Reserved
 
 import argparse
+import pickle
 import logging
 import os
 
@@ -31,9 +32,9 @@ if __name__ == '__main__':
 
     persons = os.listdir(args.input_dir)
     num_classes = len(persons)
-    aligned_examples = []
     logger.info('Found {} persons in input directory `{}`.'.format(num_classes, args.input_dir))
     for person in persons:
+        aligned_examples = []
         for input_image in os.listdir(os.path.join(args.input_dir, person)):
             input_image = os.path.join(args.input_dir, person, input_image)
             image = cv2.imread(input_image)
@@ -53,4 +54,6 @@ if __name__ == '__main__':
                 continue
 
             aligned_examples.append((aligned_face, person))
-            print(len(aligned_examples))
+
+        with open(os.path.join(args.input_dir, '{}.pkl'.format(person)), 'w') as f:
+            pickle.dump(aligned_examples, f, pickle.HIGHEST_PROTOCOL)
