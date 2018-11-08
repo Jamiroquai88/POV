@@ -71,7 +71,7 @@ if __name__ == '__main__':
     train_data, test_data, train_labels, test_labels = [], [], [], []
     for person in persons_dict:
         num_imgs = len(persons_dict[person])
-        if num_imgs > args.imgs4validation:
+        if num_imgs > 3 * args.imgs4validation:
             np.random.shuffle(persons_dict[person])
             test_data.extend([x[0] for x in persons_dict[person][:args.imgs4validation]])
             train_data.extend([x[0] for x in persons_dict[person][args.imgs4validation:]])
