@@ -9,6 +9,7 @@ import os
 import pickle
 import logging
 import argparse
+import subprocess
 
 from keras.utils import to_categorical
 from keras.optimizers import Adam
@@ -19,7 +20,7 @@ from sklearn.preprocessing import LabelEncoder
 from keras_model import create_model
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(name)s %(message)s', level=logging.INFO)
 
 # set seed
 np.random.seed(42)
@@ -51,9 +52,18 @@ if __name__ == '__main__':
     parser.add_argument('--imgs4validation', required=False, default=5, type=int,
                         help='number of images used for cross-validation')
     parser.add_argument('--num-persons', required=False, default=0, type=int, help='number of persons for training')
-
+    parser.add_argument('--no-use-gpu', required=False, default=False, action='store_true', help='use GPU for processing')
+    
     args = parser.parse_args()
-
+    if args.no_use_gpu is not True:
+        try:
+            command='nvidia-smi --query-gpu=memory.free,memory.total --format=csv |tail -n+2| awk \'BEGIN{FS=" "}{if ($1/$3 > 0.98) print NR-1}\''
+            gpu_idx = subprocess.check_output(command, shell=True).rsplit(b'\n')[0].decode('utf-8')
+            os.environ["CUDA_VISIBLE_DEVICES"] = gpu_idx
+            logger.info('Using GPU {}.'.format(gpu_idx))
+        except subprocess.CalledProcessError:
+            raise ValueError('No GPUs seems to be available.')
+        
     persons = os.listdir(args.input_dir)
     persons_dict = {}
     for idx, person in enumerate(persons):
