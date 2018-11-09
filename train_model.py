@@ -11,6 +11,7 @@ import logging
 import argparse
 
 from keras.utils import to_categorical
+from keras.optimizers import Adam
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
@@ -56,9 +57,6 @@ if __name__ == '__main__':
     persons = os.listdir(args.input_dir)
     persons_dict = {}
     for idx, person in enumerate(persons):
-        if args.num_persons != 0:
-            if idx == args.num_persons:
-                break
         pickle_file_path = os.path.join(args.input_dir, '{}.pkl'.format(person))
         if os.path.exists(pickle_file_path):
             with open(pickle_file_path, 'rb') as f:
@@ -68,10 +66,13 @@ if __name__ == '__main__':
                     logger.warning('pickle data was truncated for file `{}`.'.format(pickle_file_path))
                     continue
 
-    train_data, test_data, train_labels, test_labels = [], [], [], []
+    train_data, test_data, train_labels, test_labels, num_persons = [], [], [], [], 0
     for person in persons_dict:
         num_imgs = len(persons_dict[person])
         if num_imgs > 3 * args.imgs4validation:
+            if args.num_persons != 0:
+                if num_persons > args.num_persons:
+                    break
             np.random.shuffle(persons_dict[person])
             test_data.extend([x[0] for x in persons_dict[person][:args.imgs4validation]])
             train_data.extend([x[0] for x in persons_dict[person][args.imgs4validation:]])
@@ -86,10 +87,12 @@ if __name__ == '__main__':
     assert len(train_encoded_labels) == len(train_data)
     print(test_data[0].shape)
 
-    model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
-    batch_size = 256
+    # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+    from resnet_model import resnet_v2
+    model = resnet_v2(input_shape=train_data[0].shape, depth=56, num_classes=len(set(test_labels)))
+    batch_size = 128
     epochs = 50
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.summary()
     train_data = np.array(train_data)
