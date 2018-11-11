@@ -1,3 +1,4 @@
+scipy
 openface
 opencv-python
 dlib
