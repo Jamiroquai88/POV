@@ -84,6 +84,16 @@ if __name__ == '__main__':
             with open(pickle_file_path, 'rb') as f:
                 try:
                     persons_dict[person] = pickle.load(f)
+
+                    def show_data():
+                        import cv2
+                        print(person)
+                        cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+                        for x in persons_dict[person]:
+                            cv2.imshow('image', x[0])
+                            cv2.waitKey(0)
+                        cv2.destroyAllWindows()
+
                 except pickle.UnpicklingError:
                     logger.warning('pickle data was truncated for file `{}`.'.format(pickle_file_path))
                     continue
@@ -158,6 +168,7 @@ if __name__ == '__main__':
         print(face_prints.shape)
         assert ver_num_faces == face_prints.shape[0]
 
+        scores_matrix = cosine_similarity(face_prints, face_prints)
         tar_scores, non_scores = [], []
         for x in range(ver_num_faces):
             for y in range(x):

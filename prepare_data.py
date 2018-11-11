@@ -20,6 +20,15 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+def show_image(image):
+    import cv2
+    print(person)
+    cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+    cv2.imshow('image', image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--input-dir', required=True,
@@ -36,22 +45,21 @@ if __name__ == '__main__':
     num_classes = len(persons)
     logger.info('Found {} persons in input directory `{}`.'.format(num_classes, args.input_dir))
     for person in persons:
+        person_dir = os.path.join(args.input_dir, person)
         pickle_file_path = os.path.join(args.input_dir, '{}.pkl'.format(person))
-        if not os.path.exists(pickle_file_path):
+        if not os.path.exists(pickle_file_path) and os.path.isdir(person_dir):
             aligned_examples = []
             for input_image in os.listdir(os.path.join(args.input_dir, person)):
                 input_image = os.path.join(args.input_dir, person, input_image)
                 image = cv2.imread(input_image)
-                gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
                 align = openface.AlignDlib(args.face_predictor)
-                bbs = align.getAllFaceBoundingBoxes(rgb_image)
+                bbs = align.getAllFaceBoundingBoxes(image)
                 if len(bbs) != 1:
                     logger.warning('Detected {} faces in image `{}`, expecting only 1.'.format(len(bbs), input_image))
                     continue
                 boundary_box = bbs[0]
-                aligned_face = align.align(args.img_dim, rgb_image, boundary_box,
+                aligned_face = align.align(args.img_dim, image, boundary_box,
                                            landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
                 if aligned_face is None:
                     logger.warning('Failed to align face in file `{}`.'.format(input_image))
