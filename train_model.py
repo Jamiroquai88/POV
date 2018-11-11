@@ -34,6 +34,7 @@ def plot_curves():
     plt.xlabel('Epochs ', fontsize=16)
     plt.ylabel('Loss', fontsize=16)
     plt.title('Loss Curves', fontsize=16)
+    plt.savefig('loss_curves.png')
 
     plt.figure(figsize=[8, 6])
     plt.plot(history.history['acc'], 'r', linewidth=3.0)
@@ -42,6 +43,7 @@ def plot_curves():
     plt.xlabel('Epochs ', fontsize=16)
     plt.ylabel('Accuracy', fontsize=16)
     plt.title('Accuracy Curves', fontsize=16)
+    plt.savefig('acc_curves.png')
 
 
 if __name__ == '__main__':
@@ -52,6 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('--imgs4validation', required=False, default=5, type=int,
                         help='number of images used for cross-validation')
     parser.add_argument('--num-persons', required=False, default=0, type=int, help='number of persons for training')
+    parser.add_argument('--learning-rate', required=False, default=0.0001, type=float, help='learning rate')
     parser.add_argument('--no-use-gpu', required=False, default=False, action='store_true',
                         help='use GPU for training')
     
@@ -101,12 +104,15 @@ if __name__ == '__main__':
     logger.info('Using {} images for training with {} classes.'.format(len(train_data), len(set(train_labels))))
     logger.info('Using {} images for testing with {} classes.'.format(len(test_data), len(set(test_labels))))
 
-    model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
-    # from resnet_model import resnet_v2
-    # model = resnet_v2(input_shape=train_data[0].shape, depth=56, num_classes=len(set(test_labels)))
+    #model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+    from resnet_model import resnet_v2
+    model = resnet_v2(input_shape=train_data[0].shape, depth=20, num_classes=len(set(test_labels)))
     batch_size = 128
     epochs = 50
-    model.compile(optimizer=Adam(lr=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
+    lr = args.learning_rate
+    logger.info('Using batch size: {}, number of epochs: {}, learning rate: {}.'.format(batch_size, epochs, lr))
+    # old lr 0.00001
+    model.compile(optimizer=Adam(lr=lr), loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.summary()
     train_data = np.array(train_data)
@@ -119,8 +125,8 @@ if __name__ == '__main__':
                         verbose=1, validation_data=(test_data, test_encoded_labels))
 
     model.evaluate(test_data, test_encoded_labels)
-
-
+    plot_curves()
+    model.save('model.h5')
 
 
 
