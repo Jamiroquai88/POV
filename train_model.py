@@ -64,6 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-use-gpu', required=False, default=False, action='store_true',
                         help='use GPU for training')
     parser.add_argument('--no-train-model', required=False, default=False, action='store_true')
+    parser.add_argument('--continue-training', required=False, type=str, help='continue training of model from file')
     
     args = parser.parse_args()
     if args.no_use_gpu is not True:
@@ -131,9 +132,12 @@ if __name__ == '__main__':
         logger.info('Using {} images for training with {} classes.'.format(len(train_data), len(set(train_labels))))
         logger.info('Using {} images for testing with {} classes.'.format(len(test_data), len(set(test_labels))))
 
-        # choose model
-        # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
-        model = resnet_v2(input_shape=train_data[0].shape, depth=20, num_classes=len(set(test_labels)))
+        if not args.continue_training:
+            # choose model
+            # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+            model = resnet_v2(input_shape=train_data[0].shape, depth=20, num_classes=len(set(test_labels)))
+        else:
+            model = load_model(args.continue_training)
 
         batch_size = 128
         epochs = 50

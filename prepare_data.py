@@ -43,6 +43,7 @@ if __name__ == '__main__':
     persons = os.listdir(args.input_dir)
     random.shuffle(persons)
     num_classes = len(persons)
+    align = openface.AlignDlib(args.face_predictor)
     logger.info('Found {} persons in input directory `{}`.'.format(num_classes, args.input_dir))
     for person in persons:
         person_dir = os.path.join(args.input_dir, person)
@@ -52,8 +53,8 @@ if __name__ == '__main__':
             for input_image in os.listdir(os.path.join(args.input_dir, person)):
                 input_image = os.path.join(args.input_dir, person, input_image)
                 image = cv2.imread(input_image)
+                show_image(image)
 
-                align = openface.AlignDlib(args.face_predictor)
                 bbs = align.getAllFaceBoundingBoxes(image)
                 if len(bbs) != 1:
                     logger.warning('Detected {} faces in image `{}`, expecting only 1.'.format(len(bbs), input_image))
@@ -64,6 +65,7 @@ if __name__ == '__main__':
                 if aligned_face is None:
                     logger.warning('Failed to align face in file `{}`.'.format(input_image))
                     continue
+                show_image(aligned_face)
 
                 aligned_examples.append((aligned_face, person))
 
