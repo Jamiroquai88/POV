@@ -104,6 +104,7 @@ if __name__ == '__main__':
     ver_test_data, ver_test_labels, num_ver_persons = [], [], 0
     for person in persons_dict:
         num_imgs = len(persons_dict[person])
+
         if num_imgs > 3 * args.imgs4validation:
             if args.num_persons != 0:
                 if num_persons > args.num_persons:
@@ -137,14 +138,14 @@ if __name__ == '__main__':
             # choose model
 
             # basic model
-            # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+            model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
 
             # resnet
             # model = resnet_v2(input_shape=train_data[0].shape, depth=11, num_classes=len(set(test_labels)))
 
             # resnet50
-            model = ResNet50(include_top=False, weights='imagenet',
-                             input_shape=train_data[0].shape, classes=len(set(test_labels)))
+            # model = ResNet50(include_top=False, pooling='max',
+            #                  input_shape=train_data[0].shape, classes=len(set(test_labels)))
         else:
             model = load_model(args.continue_training)
 
