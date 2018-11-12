@@ -22,6 +22,7 @@ from sklearn.preprocessing import LabelEncoder
 from utils import get_eer, l2_norm, cosine_similarity
 from resnet_model import resnet_v2
 from keras_model import create_model
+from keras.applications.resnet50 import ResNet50
 
 logger = logging.getLogger()
 logging.basicConfig(format='%(asctime)s %(levelname)s %(name)s %(message)s', level=logging.INFO)
@@ -134,8 +135,16 @@ if __name__ == '__main__':
 
         if not args.continue_training:
             # choose model
+
+            # basic model
             # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
-            model = resnet_v2(input_shape=train_data[0].shape, depth=20, num_classes=len(set(test_labels)))
+
+            # resnet
+            # model = resnet_v2(input_shape=train_data[0].shape, depth=11, num_classes=len(set(test_labels)))
+
+            # resnet50
+            model = ResNet50(include_top=False, weights='imagenet',
+                             input_shape=train_data[0].shape, classes=len(set(test_labels)))
         else:
             model = load_model(args.continue_training)
 
