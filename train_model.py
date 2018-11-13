@@ -19,7 +19,7 @@ import numpy as np
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelEncoder
 
-from utils import get_eer, l2_norm, cosine_similarity
+from utils import get_eer, l2_norm, cosine_similarity, safe_mkdir
 from resnet_model import resnet_v2
 from keras_model import create_model
 from keras.applications.resnet50 import ResNet50
@@ -31,7 +31,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)s %(name)s %(message)s', lev
 np.random.seed(42)
 
 
-def plot_curves():
+def plot_curves(output_dir):
     plt.figure(figsize=[8, 6])
     plt.plot(history.history['loss'], 'r', linewidth=3.0)
     plt.plot(history.history['val_loss'], 'b', linewidth=3.0)
@@ -39,7 +39,7 @@ def plot_curves():
     plt.xlabel('Epochs ', fontsize=16)
     plt.ylabel('Loss', fontsize=16)
     plt.title('Loss Curves', fontsize=16)
-    plt.savefig('loss_curves.png')
+    plt.savefig(os.path.join(output_dir, 'loss_curves.png'))
 
     plt.figure(figsize=[8, 6])
     plt.plot(history.history['acc'], 'r', linewidth=3.0)
@@ -48,7 +48,7 @@ def plot_curves():
     plt.xlabel('Epochs ', fontsize=16)
     plt.ylabel('Accuracy', fontsize=16)
     plt.title('Accuracy Curves', fontsize=16)
-    plt.savefig('acc_curves.png')
+    plt.savefig(os.path.join(output_dir, 'acc_curves.png'))
 
 
 if __name__ == '__main__':
@@ -56,6 +56,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--input-dir', required=True,
                         help='path to the input directory in format Person1/image1.jpg, Person4/image3.jpg,'
                              'expects already prepared data in pickle format')
+    parser.add_argument('-D', '--output-dir', required=True,
+                        help='path to the output directory for storing figures and models')
     parser.add_argument('--imgs4validation', required=False, default=5, type=int,
                         help='number of images used for cross-validation')
     parser.add_argument('--num-persons', required=False, default=0, type=int, help='number of persons for training')
@@ -77,6 +79,8 @@ if __name__ == '__main__':
             logger.info('Using GPU {}.'.format(gpu_idx))
         except subprocess.CalledProcessError:
             raise ValueError('No GPUs seems to be available.')
+
+    safe_mkdir(args.output_dir)
         
     persons = os.listdir(args.input_dir)
     persons_dict = {}
@@ -164,10 +168,10 @@ if __name__ == '__main__':
                             verbose=1, validation_data=(test_data, test_encoded_labels))
 
         model.evaluate(test_data, test_encoded_labels)
-        plot_curves()
-        model.save('model.h5')
+        plot_curves(args.output_dir)
+        model.save(os.path.join(args.output_dir, 'model.h5'))
     else:
-        model = load_model('model.h5')
+        model = load_model(os.path.join(args.output_dir, 'model.h5'))
         model.summary()
 
         ver_num_persons, ver_num_faces = len(set(ver_test_labels)), len(ver_test_labels)
@@ -194,7 +198,3 @@ if __name__ == '__main__':
                     non_scores.append(distance)
 
         print('EER: {}'.format(get_eer(tar_scores, non_scores)))
-
-
-
-

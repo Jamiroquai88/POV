@@ -5,6 +5,9 @@
 # Author: Jan Profant <jan.profant@phonexia.com>
 # All Rights Reserved
 
+import os
+from time import sleep
+
 import numpy as np
 from scipy import spatial
 
@@ -97,3 +100,24 @@ def cosine_similarity(v1, v2):
         float: cosine similarity
     """
     return 1 - spatial.distance.cosine(v1, v2)
+
+
+def safe_mkdir(path):
+    """Behaviour similar to mkdir -p. If folder already exist, silently pass.
+    Fail only if the folder doesn't exist and cannot be created.
+
+    Args:
+        path (string_types): target path
+
+    Raises:
+        OSError
+    """
+    # avoid race condition
+    while True:
+        try:
+            if os.path.isdir(path):
+                return
+            os.makedirs(path)
+            break
+        except FileExistsError:
+            sleep(0.1)
