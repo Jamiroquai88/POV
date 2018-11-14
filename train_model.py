@@ -18,10 +18,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelEncoder
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
 
 from utils import get_eer, l2_norm, cosine_similarity, safe_mkdir
 from resnet_model import resnet_v2
 from keras_model import create_model
+from keras_model2 import create_model as create_model2
 from keras.applications.resnet50 import ResNet50
 
 logger = logging.getLogger()
@@ -49,6 +52,29 @@ def plot_curves(output_dir):
     plt.ylabel('Accuracy', fontsize=16)
     plt.title('Accuracy Curves', fontsize=16)
     plt.savefig(os.path.join(output_dir, 'acc_curves.png'))
+
+
+def plot_roc(tar_scores, non_scores, output_dir):
+    scores = np.array(tar_scores + non_scores)
+    labels = np.concatenate((np.ones((len(tar_scores))), np.zeros(len(non_scores))))
+
+    print(scores.shape)
+    print(labels.shape)
+    from sklearn.metrics import roc_curve, auc
+
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+    roc_auc = auc(fpr, tpr)
+    import matplotlib.pyplot as plt
+
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % roc_auc)
+    plt.legend(loc='lower right')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.savefig(os.path.join(output_dir, 'roc.png'))
 
 
 if __name__ == '__main__':
@@ -106,6 +132,7 @@ if __name__ == '__main__':
 
     train_data, test_data, train_labels, test_labels, num_persons = [], [], [], [], 0
     ver_test_data, ver_test_labels, num_ver_persons = [], [], 0
+    class_data, class_labels = [], []
     for person in persons_dict:
         num_imgs = len(persons_dict[person])
 
@@ -124,6 +151,9 @@ if __name__ == '__main__':
             if args.num_ver_persons != 0:
                 if num_ver_persons == args.num_ver_persons:
                     continue
+                    # class_data.extend([x[0] for x in persons_dict[person]])
+                    # class_labels.extend([person for x in range(num_imgs)])
+                    # num_ver_persons -= 1
             ver_test_data.extend([x[0] for x in persons_dict[person]])
             ver_test_labels.extend([person for x in range(num_imgs)])
             num_ver_persons += 1
@@ -142,7 +172,9 @@ if __name__ == '__main__':
             # choose model
 
             # basic model
-            model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+            # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+
+            model = create_model2(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
 
             # resnet
             # model = resnet_v2(input_shape=train_data[0].shape, depth=11, num_classes=len(set(test_labels)))
@@ -153,7 +185,7 @@ if __name__ == '__main__':
         else:
             model = load_model(args.continue_training)
 
-        batch_size = 128
+        batch_size = 1024
         epochs = 50
         lr = args.learning_rate
         logger.info('Using batch size: {}, number of epochs: {}, learning rate: {}.'.format(batch_size, epochs, lr))
@@ -181,20 +213,21 @@ if __name__ == '__main__':
         # print(model.predict(np.array(ver_test_data[:2])).shape)
 
         output_layer_model = Model(inputs=model.input, outputs=model.get_layer('flatten_1').output)
-        face_prints = l2_norm(output_layer_model.predict(np.array(ver_test_data)))
+        face_prints = output_layer_model.predict(np.array(ver_test_data))
+
+        face_prints = l2_norm(face_prints)
         print(face_prints[0])
         print(face_prints.shape)
         assert ver_num_faces == face_prints.shape[0]
 
-        scores_matrix = cosine_similarity(face_prints, face_prints)
         tar_scores, non_scores = [], []
         for x in range(ver_num_faces):
             for y in range(x):
                 distance = cosine_similarity(face_prints[x], face_prints[y])
-                print(x, y, distance)
                 if ver_test_labels[x] == ver_test_labels[y]:
                     tar_scores.append(distance)
                 else:
                     non_scores.append(distance)
 
+        plot_roc(tar_scores, non_scores, args.output_dir)
         print('EER: {}'.format(get_eer(tar_scores, non_scores)))
