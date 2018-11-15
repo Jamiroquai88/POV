@@ -16,6 +16,7 @@ from keras.optimizers import Adam
 from keras.models import load_model, Model
 import matplotlib.pyplot as plt
 import numpy as np
+from keras_preprocessing.image import ImageDataGenerator
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import LabelEncoder
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
@@ -168,13 +169,19 @@ if __name__ == '__main__':
         logger.info('Using {} images for training with {} classes.'.format(len(train_data), len(set(train_labels))))
         logger.info('Using {} images for testing with {} classes.'.format(len(test_data), len(set(test_labels))))
 
+        datagen = ImageDataGenerator(rotation_range=30,  # randomly rotate images
+                                     width_shift_range=0.1,  # randomly shift images horizontally
+                                     height_shift_range=0.1,  # randomly shift images vertically
+                                     horizontal_flip=True,  # randomly flip images
+                                     vertical_flip=False)  # randomly flip images
         if not args.continue_training:
+
             # choose model
 
             # basic model
-            # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+            model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
 
-            model = create_model2(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+            # model = create_model2(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
 
             # resnet
             # model = resnet_v2(input_shape=train_data[0].shape, depth=11, num_classes=len(set(test_labels)))
@@ -185,7 +192,7 @@ if __name__ == '__main__':
         else:
             model = load_model(args.continue_training)
 
-        batch_size = 1024
+        batch_size = 256
         epochs = 50
         lr = args.learning_rate
         logger.info('Using batch size: {}, number of epochs: {}, learning rate: {}.'.format(batch_size, epochs, lr))
@@ -196,8 +203,10 @@ if __name__ == '__main__':
         test_data = np.array(test_data)
         train_encoded_labels = to_categorical(train_encoded_labels)
         test_encoded_labels = to_categorical(test_encoded_labels)
-        history = model.fit(train_data, train_encoded_labels, batch_size=batch_size, epochs=epochs,
-                            verbose=1, validation_data=(test_data, test_encoded_labels))
+        history = model.fit_generator(datagen.flow(train_data, train_encoded_labels, batch_size=batch_size),
+                                      steps_per_epoch=int(np.ceil(train_data.shape[0] / float(batch_size))),
+                                      epochs=epochs, workers=4, verbose=1,
+                                      validation_data=(test_data, test_encoded_labels))
 
         model.evaluate(test_data, test_encoded_labels)
         plot_curves(args.output_dir)
