@@ -78,6 +78,16 @@ def plot_roc(tar_scores, non_scores, output_dir):
     plt.savefig(os.path.join(output_dir, 'roc.png'))
 
 
+def show_data():
+    import cv2
+    print(person)
+    cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+    for x in persons_dict[person]:
+        cv2.imshow('image', x[0])
+        cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--input-dir', required=True,
@@ -117,15 +127,6 @@ if __name__ == '__main__':
             with open(pickle_file_path, 'rb') as f:
                 try:
                     persons_dict[person] = pickle.load(f)
-
-                    def show_data():
-                        import cv2
-                        print(person)
-                        cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-                        for x in persons_dict[person]:
-                            cv2.imshow('image', x[0])
-                            cv2.waitKey(0)
-                        cv2.destroyAllWindows()
 
                 except pickle.UnpicklingError:
                     logger.warning('pickle data was truncated for file `{}`.'.format(pickle_file_path))
@@ -179,12 +180,12 @@ if __name__ == '__main__':
             # choose model
 
             # basic model
-            model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
+            # model = create_model(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
 
             # model = create_model2(input_shape=train_data[0].shape, num_classes=len(set(test_labels)))
 
             # resnet
-            # model = resnet_v2(input_shape=train_data[0].shape, depth=11, num_classes=len(set(test_labels)))
+            model = resnet_v2(input_shape=train_data[0].shape, depth=11, num_classes=len(set(test_labels)))
 
             # resnet50
             # model = ResNet50(include_top=False, pooling='max',
@@ -203,6 +204,7 @@ if __name__ == '__main__':
         test_data = np.array(test_data)
         train_encoded_labels = to_categorical(train_encoded_labels)
         test_encoded_labels = to_categorical(test_encoded_labels)
+
         history = model.fit_generator(datagen.flow(train_data, train_encoded_labels, batch_size=batch_size),
                                       steps_per_epoch=int(np.ceil(train_data.shape[0] / float(batch_size))),
                                       epochs=epochs, workers=4, verbose=1,
@@ -219,14 +221,11 @@ if __name__ == '__main__':
         logger.info('Using {} persons with {} images for verification.'.format(ver_num_persons, ver_num_faces))
 
         ver_test_data = np.array(ver_test_data)
-        # print(model.predict(np.array(ver_test_data[:2])).shape)
 
         output_layer_model = Model(inputs=model.input, outputs=model.get_layer('flatten_1').output)
         face_prints = output_layer_model.predict(np.array(ver_test_data))
 
         face_prints = l2_norm(face_prints)
-        print(face_prints[0])
-        print(face_prints.shape)
         assert ver_num_faces == face_prints.shape[0]
 
         tar_scores, non_scores = [], []
@@ -238,5 +237,7 @@ if __name__ == '__main__':
                 else:
                     non_scores.append(distance)
 
+        np.save(os.path.join(args.output_dir, 'tar.npy'), tar_scores)
+        np.save(os.path.join(args.output_dir, 'non.npy'), non_scores)
         plot_roc(tar_scores, non_scores, args.output_dir)
         print('EER: {}'.format(get_eer(tar_scores, non_scores)))
