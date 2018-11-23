@@ -5,6 +5,7 @@
 # Author: Jan Profant <jan.profant@phonexia.com>
 # All Rights Reserved
 
+import csv
 import os
 import pickle
 import logging
@@ -55,12 +56,10 @@ def plot_curves(output_dir):
     plt.savefig(os.path.join(output_dir, 'acc_curves.png'))
 
 
-def plot_roc(tar_scores, non_scores, output_dir):
+def plot_roc(tar_scores, non_scores, label, color, output_path):
     scores = np.array(tar_scores + non_scores)
     labels = np.concatenate((np.ones((len(tar_scores))), np.zeros(len(non_scores))))
 
-    print(scores.shape)
-    print(labels.shape)
     from sklearn.metrics import roc_curve, auc
 
     fpr, tpr, thresholds = roc_curve(labels, scores)
@@ -68,14 +67,14 @@ def plot_roc(tar_scores, non_scores, output_dir):
     import matplotlib.pyplot as plt
 
     plt.title('Receiver Operating Characteristic')
-    plt.plot(fpr, tpr, 'b', label='AUC = %0.2f' % roc_auc)
+    plt.plot(fpr, tpr, color, label='%s AUC = %0.2f' % (label, roc_auc * 100))
     plt.legend(loc='lower right')
     plt.plot([0, 1], [0, 1], 'r--')
     plt.xlim([0, 1])
     plt.ylim([0, 1])
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(os.path.join(output_dir, 'roc.png'))
+    plt.savefig(output_path)
 
 
 def show_data():
@@ -95,6 +94,8 @@ if __name__ == '__main__':
                              'expects already prepared data in pickle format')
     parser.add_argument('-D', '--output-dir', required=True,
                         help='path to the output directory for storing figures and models')
+    parser.add_argument('--lfw-path', required=False, default='../data/lfw', help='path to LFW dataset')
+    parser.add_argument('--lfw-trials', required=False, default='../data/lfw_pairs.txt', help='path to lfw pairs')
     parser.add_argument('--imgs4validation', required=False, default=5, type=int,
                         help='number of images used for cross-validation')
     parser.add_argument('--num-persons', required=False, default=0, type=int, help='number of persons for training')
@@ -122,12 +123,14 @@ if __name__ == '__main__':
     persons = os.listdir(args.input_dir)
     persons_dict = {}
     for idx, person in enumerate(persons):
+        # TODO fix
+        if idx == 1000:
+            break
         pickle_file_path = os.path.join(args.input_dir, '{}.pkl'.format(person))
         if os.path.exists(pickle_file_path):
             with open(pickle_file_path, 'rb') as f:
                 try:
                     persons_dict[person] = pickle.load(f)
-
                 except pickle.UnpicklingError:
                     logger.warning('pickle data was truncated for file `{}`.'.format(pickle_file_path))
                     continue
@@ -199,6 +202,7 @@ if __name__ == '__main__':
         logger.info('Using batch size: {}, number of epochs: {}, learning rate: {}.'.format(batch_size, epochs, lr))
         model.compile(optimizer=Adam(lr=lr), loss='categorical_crossentropy', metrics=['accuracy'])
 
+        print('Number of layers: {}.'.format(len(model.layers)))
         model.summary()
         train_data = np.array(train_data)
         test_data = np.array(test_data)
@@ -215,6 +219,7 @@ if __name__ == '__main__':
         model.save(os.path.join(args.output_dir, 'model.h5'))
     else:
         model = load_model(os.path.join(args.output_dir, 'model.h5'))
+        print('Number of layers: {}.'.format(len(model.layers)))
         model.summary()
 
         ver_num_persons, ver_num_faces = len(set(ver_test_labels)), len(ver_test_labels)
@@ -239,5 +244,71 @@ if __name__ == '__main__':
 
         np.save(os.path.join(args.output_dir, 'tar.npy'), tar_scores)
         np.save(os.path.join(args.output_dir, 'non.npy'), non_scores)
-        plot_roc(tar_scores, non_scores, args.output_dir)
+        plot_roc(tar_scores, non_scores, label='', color='b', output_path=os.path.join(args.output_dir, 'roc.png'))
+        print('EER: {}'.format(get_eer(tar_scores, non_scores)))
+
+        # lfw
+        persons = os.listdir(args.lfw_path)
+        persons_dict = {}
+        for idx, person in enumerate(persons):
+            if os.path.isdir(os.path.join(args.lfw_path, person)):
+                num_images = len(os.listdir(os.path.join(args.lfw_path, person)))
+                pickle_file_path = os.path.join(args.lfw_path, '{}.pkl'.format(person))
+                if os.path.exists(pickle_file_path):
+                    with open(pickle_file_path, 'rb') as f:
+                        try:
+                            images = pickle.load(f)
+                            if len(images) == num_images:
+                                persons_dict[person] = images
+                        except pickle.UnpicklingError:
+                            logger.warning('pickle data was truncated for file `{}`.'.format(pickle_file_path))
+                            continue
+
+        lfw_data = {}
+        trials = []
+        with open(args.lfw_trials) as f:
+            csv_reader = csv.reader(f, delimiter='\t')
+            for row in csv_reader:
+                if len(row) == 3:
+                    # same person comparison
+                    person, enroll_idx, test_idx = row
+                    if person in persons_dict:
+                        if person not in lfw_data:
+                            lfw_data[person] = output_layer_model.predict(
+                                np.array([x[0] for x in persons_dict[person]]))
+                    else:
+                        logger.warning('Ignoring trial {}.'.format(' '.join(row)))
+                        continue
+                    trials.append((person, int(enroll_idx) - 1, person, int(test_idx) - 1))
+                elif len(row) == 4:
+                    # different persons
+                    enroll_person, enroll_idx, test_person, test_idx = row
+                    if enroll_person in persons_dict and test_person in persons_dict:
+                        if enroll_person not in lfw_data:
+                            lfw_data[enroll_person] = output_layer_model.predict(
+                                np.array([x[0] for x in persons_dict[enroll_person]]))
+                        if test_person not in lfw_data:
+                            lfw_data[test_person] = output_layer_model.predict(
+                                np.array([x[0] for x in persons_dict[test_person]]))
+                    else:
+                        logger.warning('Ignoring trial {}.'.format(' '.join(row)))
+                        continue
+                    trials.append((enroll_person, int(enroll_idx) - 1, test_person, int(test_idx) - 1))
+                else:
+                    raise ValueError('Unexpected row {}.'.format(' '.join(row)))
+
+        tar_scores, non_scores = [], []
+        logger.info('Computing scores for {} trials.'.format(len(trials)))
+        for trial in trials:
+            enroll_person, enroll_idx, test_person, test_idx = trial
+            enroll_emb, test_emb = lfw_data[enroll_person][enroll_idx], lfw_data[test_person][test_idx]
+            distance = cosine_similarity(l2_norm(enroll_emb), l2_norm(test_emb))
+            if enroll_person == test_person:
+                tar_scores.append(distance)
+            else:
+                non_scores.append(distance)
+
+        np.save(os.path.join(args.output_dir, 'tar_lfw.npy'), tar_scores)
+        np.save(os.path.join(args.output_dir, 'non_lfw.npy'), non_scores)
+        plot_roc(tar_scores, non_scores, label='', color='b', output_path=os.path.join(args.output_dir, 'roc_lfw.png'))
         print('EER: {}'.format(get_eer(tar_scores, non_scores)))

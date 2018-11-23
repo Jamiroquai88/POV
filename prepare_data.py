@@ -25,8 +25,8 @@ def show_image(image):
     print(person)
     cv2.namedWindow('image', cv2.WINDOW_NORMAL)
     cv2.imshow('image', image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    if cv2.waitKey(0) == '32':
+        cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
@@ -53,19 +53,21 @@ if __name__ == '__main__':
             for input_image in os.listdir(os.path.join(args.input_dir, person)):
                 input_image = os.path.join(args.input_dir, person, input_image)
                 image = cv2.imread(input_image)
-                show_image(image)
+                # show_image(image)
 
                 bbs = align.getAllFaceBoundingBoxes(image)
                 if len(bbs) != 1:
                     logger.warning('Detected {} faces in image `{}`, expecting only 1.'.format(len(bbs), input_image))
-                    continue
-                boundary_box = bbs[0]
+                    boundary_box = None
+                else:
+                    boundary_box = bbs[0]
                 aligned_face = align.align(args.img_dim, image, boundary_box,
                                            landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
                 if aligned_face is None:
                     logger.warning('Failed to align face in file `{}`.'.format(input_image))
                     continue
-                show_image(aligned_face)
+
+                # show_image(aligned_face)
 
                 aligned_examples.append((aligned_face, person))
 
