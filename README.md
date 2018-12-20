@@ -1,2 +1,2 @@
 # POV
-Project for POV - speaker verification from image
+Project for POV - face verification from image
